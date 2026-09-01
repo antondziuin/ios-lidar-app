@@ -2,7 +2,7 @@
 
 Стрим **задней камеры** и **LiDAR** с iPhone 14 Pro Max на ПК по Wi‑Fi. Телефон шлёт JPEG + depth; на ПК собирается цветное облако точек.
 
-Собрать и поставить приложение на устройство можно только **на Mac с Xcode**. Этот репозиторий можно держать на Windows: исходники общие, `.xcodeproj` генерируется на Mac.
+Собрать IPA можно в Codemagic; на свой iPhone без платной подписки ставится через Sideloadly (7 дней) или через Xcode на Mac.
 
 Нужен реальный iPhone с задним LiDAR. Симулятор не подойдёт.
 
@@ -36,32 +36,28 @@ netsh advfirewall firewall add rule name="LiDAR Streamer" dir=in action=allow pr
 
 Выход из просмотрщика: `q` или `Esc`.
 
-## 2. iOS-приложение (Mac)
+## 2. Поставить на свой iPhone (без платного Developer Program)
 
-1. Установите [Xcode](https://developer.apple.com/xcode/) и [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
-2. Подключите iPhone 14 Pro Max, включите Developer Mode.
-3. В каталоге `ios-app`:
+IPA из Codemagic **не подписан**. На телефон его ставит [Sideloadly](https://sideloadly.io/) с обычным Apple ID. Срок **7 дней**, потом поставить заново.
 
-```bash
-xcodegen generate
-open LiDARStreamer.xcodeproj
-```
+1. В Codemagic запустите workflow **iOS device IPA (unsigned)** (или дождитесь автосборки после пуша в `main`).
+2. Скачайте артефакт `LiDARStreamer-unsigned.ipa`.
+3. На iPhone: **Настройки → Конфиденциальность и безопасность → Режим разработчика** — включить, перезагрузить.
+4. На Windows установите [Sideloadly](https://sideloadly.io/) и [Apple Devices](https://apps.microsoft.com/detail/9np83lwlpz9k) (или iTunes).
+5. Подключите iPhone кабелем, в Sideloadly: IPA, свой Apple ID, Start.
+6. На телефоне: **Настройки → Основные → VPN и управление устройством** — доверить своему Apple ID. При первом запуске разрешить камеру.
 
-4. В Xcode: Signing & Capabilities → ваш Team. Bundle ID: `com.lidarstreamer.app`.
-5. Run на устройстве (не на симуляторе).
-6. Разрешите доступ к камере. Введите IP ПК и порт `9000`, нажмите **Старт**.
+Дальше: ПК и телефон в одной Wi‑Fi, на ПК `python viewer.py --port 9000`, в приложении IP компьютера и **Старт**.
 
-На экране: превью задней камеры, статус, fps и КБ/с.
+Если есть Mac, надёжнее Xcode: `cd ios-app && xcodegen generate && open LiDARStreamer.xcodeproj` → Signing = ваш Apple ID (Personal Team) → Run на устройстве. Тоже 7 дней.
 
 ## 3. Сборка в Codemagic
 
-Конфиг: [`codemagic.yaml`](codemagic.yaml) в корне репозитория. Сборка идёт из `ios-app/` (`working_directory`); папка `pc-viewer/` в iOS-билд не входит. Изменения только в Python-просмотрщике сборку iOS не запускают.
+Конфиг: [`codemagic.yaml`](codemagic.yaml) в корне. Сборка из `ios-app/`; `pc-viewer/` не собирается.
 
-1. В Codemagic: вкладка **Webhooks** → **Update webhook**.
-2. Вкладка **codemagic.yaml** → ветка `main` → кнопка проверки конфига.
-3. Start build → workflow **iOS compile (unsigned)**. Это проверка компиляции без Apple-подписи (симулятор). На телефон такой `.app` не ставится.
+Нужный workflow для телефона: **iOS device IPA (unsigned)** — IPA под реальное устройство, без Apple Developer Program. На iPhone ставится через Sideloadly (см. выше).
 
-Подписанный IPA (**iOS IPA (signed)**) — только вручную, после [code signing](https://docs.codemagic.io/yaml-quick-start/building-a-native-ios-app/): Team settings → Code signing identities (сертификат + provisioning profile) с bundle id `com.lidarstreamer.app`. Нужен Apple Developer Program.
+**iOS IPA (signed)** — только если есть платный Developer Program и сертификаты в Codemagic.
 
 ## Протокол
 

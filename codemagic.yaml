@@ -1,11 +1,10 @@
 # Codemagic looks for this file in the repository root.
 # iOS sources live in ios-app/; pc-viewer is a Python desktop app and is not built here.
 # Docs: https://docs.codemagic.io/yaml-quick-start/building-a-native-ios-app/
-# Monorepo working_directory: https://docs.codemagic.io/yaml-basic-configuration/yaml-getting-started/
 
 workflows:
-  ios-compile:
-    name: iOS compile (unsigned)
+  ios-device-ipa:
+    name: iOS device IPA (unsigned)
     instance_type: mac_mini_m2
     max_build_duration: 60
     working_directory: ios-app
@@ -32,26 +31,37 @@ workflows:
         script: brew install xcodegen
       - name: Generate Xcode project
         script: xcodegen generate
-      - name: Build without code signing
+      - name: Build for iPhone (no Apple signing)
         script: |
           set -euo pipefail
           xcodebuild \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -configuration Debug \
             -derivedDataPath build \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
             build
+      - name: Package unsigned IPA
+        script: |
+          set -euo pipefail
+          APP="build/Build/Products/Debug-iphoneos/LiDARStreamer.app"
+          test -d "$APP"
+          rm -rf dist
+          mkdir -p dist/Payload
+          ditto "$APP" dist/Payload/LiDARStreamer.app
+          (cd dist && zip -qry "$CM_BUILD_DIR/ios-app/LiDARStreamer-unsigned.ipa" Payload)
+          ls -lh "$CM_BUILD_DIR/ios-app/LiDARStreamer-unsigned.ipa"
     artifacts:
-      - ios-app/build/**/*.app
+      - ios-app/LiDARStreamer-unsigned.ipa
       - /tmp/xcodebuild_logs/*.log
 
   ios-ipa:
-    name: iOS IPA (signed)
+    name: iOS IPA (signed, paid Developer Program)
     instance_type: mac_mini_m2
     max_build_duration: 120
     working_directory: ios-app
