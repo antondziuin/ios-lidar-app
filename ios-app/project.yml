@@ -1,0 +1,53 @@
+name: LiDARStreamer
+options:
+  bundleIdPrefix: com.lidarstreamer
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: "1.0"
+
+targets:
+  LiDARStreamer:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: LiDARStreamer
+        excludes:
+          - Info.plist
+    info:
+      path: LiDARStreamer/Info.plist
+      properties:
+        CFBundleDisplayName: LiDAR Streamer
+        UILaunchScreen: {}
+        NSCameraUsageDescription: Камера и LiDAR нужны, чтобы передавать изображение и глубину на ПК.
+        NSLocalNetworkUsageDescription: Приложению нужен доступ к локальной сети, чтобы отправлять кадры на ПК.
+        UIRequiredDeviceCapabilities:
+          - arm64
+          - arkit
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIStatusBarHidden: true
+        UIRequiresFullScreen: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.lidarstreamer.app
+        PRODUCT_NAME: LiDARStreamer
+        INFOPLIST_FILE: LiDARStreamer/Info.plist
+        GENERATE_INFOPLIST_FILE: false
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: false
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: false
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: false
