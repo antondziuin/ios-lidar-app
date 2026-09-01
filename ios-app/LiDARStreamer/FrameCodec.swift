@@ -14,7 +14,7 @@ enum FrameCodec {
     static func packet(body: Data) -> Data {
         var packet = Data(capacity: 4 + body.count)
         var length = UInt32(body.count).bigEndian
-        packet.append(Data(bytes: &length, count: 4))
+        Swift.withUnsafeBytes(of: &length) { packet.append(contentsOf: $0) }
         packet.append(body)
         return packet
     }
@@ -48,15 +48,19 @@ enum DeflateCodec {
 
     private static func transcode(_ input: Data, operation: compression_stream_operation) -> Data? {
         guard !input.isEmpty else { return Data() }
-        var stream = compression_stream()
-        let status = compression_stream_init(&stream, operation, COMPRESSION_ZLIB)
+
+        let stream = UnsafeMutablePointer<compression_stream>.allocate(capacity: 1)
+        defer { stream.deallocate() }
+        memset(stream, 0, MemoryLayout<compression_stream>.stride)
+
+        let status = compression_stream_init(stream, operation, COMPRESSION_ZLIB)
         guard status != COMPRESSION_STATUS_ERROR else { return nil }
-        defer { compression_stream_destroy(&stream) }
+        defer { compression_stream_destroy(stream) }
 
         return input.withUnsafeBytes { srcRaw -> Data? in
             guard let src = srcRaw.bindMemory(to: UInt8.self).baseAddress else { return nil }
-            stream.src_ptr = src
-            stream.src_size = input.count
+            stream.pointee.src_ptr = src
+            stream.pointee.src_size = input.count
 
             let chunk = 64 * 1024
             var output = Data()
@@ -64,10 +68,10 @@ enum DeflateCodec {
             defer { dst.deallocate() }
 
             while true {
-                stream.dst_ptr = dst
-                stream.dst_size = chunk
-                let proc = compression_stream_process(&stream, Int32(COMPRESSION_STREAM_FINALIZE.rawValue))
-                let produced = chunk - stream.dst_size
+                stream.pointee.dst_ptr = dst
+                stream.pointee.dst_size = chunk
+                let proc = compression_stream_process(stream, Int32(COMPRESSION_STREAM_FINALIZE.rawValue))
+                let produced = chunk - stream.pointee.dst_size
                 if produced > 0 {
                     output.append(dst, count: produced)
                 }
@@ -132,20 +136,16 @@ final class FrameEncoder {
         transform: simd_float4x4
     ) -> Data? {
         guard let jpegResult = jpegData(from: capturedImage) else { return nil }
-        guard let depthBytes = PixelBufferIO.copyFloat32(from: depthMap) else { return nil }
+        guard let depthPlane = PixelBufferIO.copyFloat32(from: depthMap) else { return nil }
+        let confidencePlane = confidenceMap.flatMap { PixelBufferIO.copyUInt8(from: $0) }
 
-        var confidenceBytes: Data?
-        if let confidenceMap, let copied = PixelBufferIO.copyUInt8(from: confidenceMap) {
-            confidenceBytes = copied
-        }
-
-        guard let compressedDepth = DeflateCodec.compress(depthBytes.bytes) else { return nil }
+        guard let compressedDepth = DeflateCodec.compress(depthPlane.data) else { return nil }
 
         var flags: UInt8 = 0
         var confPayload = Data()
-        if let confidenceBytes {
+        if let confidencePlane {
             flags |= FrameCodec.flagConfidence
-            confPayload = confidenceBytes.bytes
+            confPayload = confidencePlane.data
         }
 
         var k = FrameCodec.packIntrinsics(intrinsics)
@@ -165,8 +165,8 @@ final class FrameEncoder {
         writer.f64(timestamp)
         writer.u16(UInt16(jpegResult.width))
         writer.u16(UInt16(jpegResult.height))
-        writer.u16(UInt16(depthBytes.width))
-        writer.u16(UInt16(depthBytes.height))
+        writer.u16(UInt16(depthPlane.width))
+        writer.u16(UInt16(depthPlane.height))
         writer.u32(UInt32(jpegResult.data.count))
         writer.u32(UInt32(compressedDepth.count))
         writer.u32(UInt32(confPayload.count))
@@ -224,7 +224,7 @@ final class FrameEncoder {
 
 enum PixelBufferIO {
     struct Plane {
-        let bytes: Data
+        let data: Data
         let width: Int
         let height: Int
     }
@@ -257,6 +257,6 @@ enum PixelBufferIO {
                 memcpy(dst.advanced(by: row * rowBytes), src, rowBytes)
             }
         }
-        return Plane(bytes: data, width: width, height: height)
+        return Plane(data: data, width: width, height: height)
     }
 }
