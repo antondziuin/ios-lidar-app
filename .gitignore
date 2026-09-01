@@ -12,3 +12,4 @@ xcuserdata/
 *.xccheckout
 *.moved-aside
 build/
+ios-app/*.xcodeproj/

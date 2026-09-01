@@ -53,6 +53,16 @@ open LiDARStreamer.xcodeproj
 
 На экране: превью задней камеры, статус, fps и КБ/с.
 
+## 3. Сборка в Codemagic
+
+Конфиг: [`codemagic.yaml`](codemagic.yaml) в корне репозитория. Сборка идёт из `ios-app/` (`working_directory`); папка `pc-viewer/` в iOS-билд не входит. Изменения только в Python-просмотрщике сборку iOS не запускают.
+
+1. В Codemagic: вкладка **Webhooks** → **Update webhook**.
+2. Вкладка **codemagic.yaml** → ветка `main` → кнопка проверки конфига.
+3. Start build → workflow **iOS compile (unsigned)**. Это проверка компиляции без Apple-подписи (симулятор). На телефон такой `.app` не ставится.
+
+Подписанный IPA (**iOS IPA (signed)**) — только вручную, после [code signing](https://docs.codemagic.io/yaml-quick-start/building-a-native-ios-app/): Team settings → Code signing identities (сертификат + provisioning profile) с bundle id `com.lidarstreamer.app`. Нужен Apple Developer Program.
+
 ## Протокол
 
 TCP, кадр: `uint32` BE (длина тела) + тело `LIDR` v1. В теле — JPEG RGB (~1280×720), raw-DEFLATE (не zlib-обёртка) depth Float32 в метрах, опционально confidence UInt8, intrinsics 3×3, pose 4×4 (camera→world, column-major). Частота около 12 fps.

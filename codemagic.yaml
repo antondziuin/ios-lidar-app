@@ -1,0 +1,82 @@
+# Codemagic looks for this file in the repository root.
+# iOS sources live in ios-app/; pc-viewer is a Python desktop app and is not built here.
+# Docs: https://docs.codemagic.io/yaml-quick-start/building-a-native-ios-app/
+# Monorepo working_directory: https://docs.codemagic.io/yaml-basic-configuration/yaml-getting-started/
+
+workflows:
+  ios-compile:
+    name: iOS compile (unsigned)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    working_directory: ios-app
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+      cancel_previous_builds: true
+    when:
+      changeset:
+        includes:
+          - ios-app/**
+          - codemagic.yaml
+    environment:
+      xcode: latest
+      vars:
+        XCODE_PROJECT: LiDARStreamer.xcodeproj
+        XCODE_SCHEME: LiDARStreamer
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+      - name: Generate Xcode project
+        script: xcodegen generate
+      - name: Build without code signing
+        script: |
+          set -euo pipefail
+          xcodebuild \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+    artifacts:
+      - ios-app/build/**/*.app
+      - /tmp/xcodebuild_logs/*.log
+
+  ios-ipa:
+    name: iOS IPA (signed)
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+    working_directory: ios-app
+    environment:
+      xcode: latest
+      ios_signing:
+        distribution_type: development
+        bundle_identifier: com.lidarstreamer.app
+      vars:
+        XCODE_PROJECT: LiDARStreamer.xcodeproj
+        XCODE_SCHEME: LiDARStreamer
+        BUNDLE_ID: com.lidarstreamer.app
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+      - name: Generate Xcode project
+        script: xcodegen generate
+      - name: Set up code signing
+        script: xcode-project use-profiles
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/ios-app/$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - ios-app/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
